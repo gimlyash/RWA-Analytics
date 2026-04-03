@@ -1,3 +1,5 @@
+"""DeFiLlama: протоколы (api) и пулы доходности (yields). Публичные GET без ключа."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -6,6 +8,8 @@ import requests
 
 DEFILLAMA_PROTOCOLS_URL = "https://api.llama.fi/protocols"
 DEFILLAMA_YIELDS_URL = "https://yields.llama.fi/pools"
+
+DEFAULT_ITEM_LIMIT = 100
 
 
 def _request_json(url: str, timeout_sec: int) -> tuple[bool, Any, str | None]:
@@ -21,7 +25,10 @@ def _request_json(url: str, timeout_sec: int) -> tuple[bool, Any, str | None]:
         return False, None, f"Invalid JSON: {exc}"
 
 
-def fetch_defillama_snapshot(timeout_sec: int = 30) -> dict[str, Any]:
+def fetch_defillama_snapshot(
+    timeout_sec: int = 30,
+    limit: int = DEFAULT_ITEM_LIMIT,
+) -> dict[str, Any]:
     ok, payload, error = _request_json(DEFILLAMA_PROTOCOLS_URL, timeout_sec)
     if not ok:
         return {
@@ -41,8 +48,7 @@ def fetch_defillama_snapshot(timeout_sec: int = 30) -> dict[str, Any]:
             "protocols": [],
         }
 
-    # ограничение размера, чтобы не брать весь массив
-    protocols = payload[:100]
+    protocols = payload[:limit] if limit > 0 else payload
     return {
         "source": "defillama_protocols",
         "ok": True,
@@ -52,7 +58,10 @@ def fetch_defillama_snapshot(timeout_sec: int = 30) -> dict[str, Any]:
     }
 
 
-def fetch_defillama_yields_snapshot(timeout_sec: int = 30) -> dict[str, Any]:
+def fetch_defillama_yields_snapshot(
+    timeout_sec: int = 30,
+    limit: int = DEFAULT_ITEM_LIMIT,
+) -> dict[str, Any]:
     ok, payload, error = _request_json(DEFILLAMA_YIELDS_URL, timeout_sec)
     if not ok:
         return {
@@ -83,5 +92,5 @@ def fetch_defillama_yields_snapshot(timeout_sec: int = 30) -> dict[str, Any]:
         "ok": True,
         "error": None,
         "pools_total": len(pools),
-        "pools": pools[:100],
+        "pools": pools[:limit] if limit > 0 else pools,
     }

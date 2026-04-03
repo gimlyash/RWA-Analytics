@@ -1,9 +1,3 @@
-"""
-Оркестратор: DeFiLlama (протоколы + yields) → CollectionBundle, опционально JSON на диск.
-
-Новые источники: вызывайте ``_snapshot_from_fetch_result`` после своего ``fetch_*``.
-"""
-
 from __future__ import annotations
 
 import json
@@ -27,7 +21,6 @@ def _repo_root() -> Path:
 
 
 def _snapshot_from_fetch_result(result: dict[str, Any]) -> SourceSnapshot:
-    """Dict от fetch_* → SourceSnapshot (source/ok/error — метаданные, остальное в data)."""
     return SourceSnapshot(
         source=str(result.get("source", "unknown")),
         fetched_at_utc=utc_now_iso(),
@@ -63,7 +56,7 @@ class DataCollectorService:
         timeout = int(self.settings.http_timeout_sec)
         lim = self.settings.snapshot_item_limit
 
-        steps: list[tuple[str, Any]] = [
+        steps: list[tuple[str, Callable[[], dict[str, Any]]]] = [
             ("defillama_protocols", lambda: fetch_defillama_snapshot(timeout_sec=timeout, limit=lim)),
             ("defillama_yields", lambda: fetch_defillama_yields_snapshot(timeout_sec=timeout, limit=lim)),
         ]

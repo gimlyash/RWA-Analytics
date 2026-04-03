@@ -10,6 +10,7 @@ import json
 import logging
 from pathlib import Path
 from typing import Any
+from typing import Callable
 
 from backend.data_collectors.config import CollectorSettings, load_collector_settings
 from backend.data_collectors.models import CollectionBundle, SourceSnapshot, utc_now_iso

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 from typing import Callable
 
+from backend.core.db import persist_collection_bundle
 from backend.data_collectors.config import CollectorSettings, load_collector_settings
 from backend.data_collectors.models import CollectionBundle, SourceSnapshot, utc_now_iso
 from backend.data_collectors.sources.defillama import (
@@ -83,6 +84,7 @@ class DataCollectorService:
         *,
         output_dir: Path | None = None,
         filename_prefix: str = "snapshot",
+        save_database: bool = True,
     ) -> tuple[CollectionBundle, Path]:
         bundle = self.collect()
         root = _repo_root()
@@ -95,16 +97,31 @@ class DataCollectorService:
             encoding="utf-8",
         )
         logger.info("Wrote %s", path)
+
+        if save_database and self.settings.database_url:
+            run_id = persist_collection_bundle(self.settings.database_url, bundle)
+            logger.info("PostgreSQL collection_runs.id=%s", run_id)
+
         return bundle, path
+
+    def collect_and_save_database_only(self) -> CollectionBundle:
+        bundle = self.collect()
+        if self.settings.database_url:
+            run_id = persist_collection_bundle(self.settings.database_url, bundle)
+            logger.info("PostgreSQL collection_runs.id=%s", run_id)
+        return bundle
 
 
 def collect_all(
     *,
     save_json: bool = True,
+    save_database: bool = True,
     settings: CollectorSettings | None = None,
 ) -> CollectionBundle:
     service = DataCollectorService(settings=settings)
     if save_json:
-        bundle, _ = service.collect_and_save_json()
+        bundle, _ = service.collect_and_save_json(save_database=save_database)
         return bundle
+    if save_database and service.settings.database_url:
+        return service.collect_and_save_database_only()
     return service.collect()

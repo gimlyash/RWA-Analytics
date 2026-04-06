@@ -26,13 +26,11 @@ def get_engine(database_url: str) -> Engine:
 
 
 def init_db(database_url: str) -> None:
-    """Создает таблицы при необходимости."""
     engine = get_engine(database_url)
     Base.metadata.create_all(engine)
 
 
 def persist_collection_bundle(database_url: str, bundle: CollectionBundle) -> int:
-    """Сохраняет бандл в PostgreSQL и возвращает id записи collection_runs."""
     init_db(database_url)
     engine = get_engine(database_url)
     session_local = sessionmaker(engine, expire_on_commit=False, future=True)

@@ -18,7 +18,9 @@ class CollectionRun(Base):
     __tablename__ = "collection_runs"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    collected_at_utc: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    collected_at_utc: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
     meta: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
 
     snapshots: Mapped[list["SourceSnapshotRow"]] = relationship(
@@ -37,7 +39,9 @@ class SourceSnapshotRow(Base):
         index=True,
     )
     source: Mapped[str] = mapped_column(String(255), nullable=False)
-    fetched_at_utc: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    fetched_at_utc: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
     ok: Mapped[bool] = mapped_column(Boolean, nullable=False)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     data: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)

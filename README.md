@@ -23,3 +23,19 @@ The system helps users track yield, assess risks, and make informed decisions wh
 - Assessing key risks: regulatory, liquidity, oracle failure, redemption delay
 - Backtesting and historical analysis (2024–2026)
 
+# Tech stack
+
+### Back
+- **Python 3.14+**
+- **Django** — main web framework
+- **PostgreSQL** — Database
+
+### Telegram Bot 
+- **aiogram 3.x** - async framework
+
+### AI and Analytics
+- **LangChain / LangGraph** - framework for creating an AI agent
+- **LLM**: Gemini 3 Flash / Claude 3.5 Sonnet / Groq (via API)
+- **pandas, numpy, scikit-learn, XGBoost** - data analysis
+- **Plotly** - interactive visualization
+

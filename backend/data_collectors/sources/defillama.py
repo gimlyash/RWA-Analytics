@@ -97,14 +97,18 @@ async def fetch_defillama_yields_snapshot(
         "pools": pools[:limit] if limit > 0 else pools,
     }
 
+
 # for possible sync use
 def fetch_defillama_snapshot_sync(
     timeout_sec: int = 30,
     limit: int = DEFAULT_ITEM_LIMIT,
 ) -> dict[str, Any]:
     if asyncio.get_event_loop().is_running():
-        raise RuntimeError("fetch_defillama_snapshot_sync() cannot be used inside a running event loop; use await fetch_defillama_snapshot(...)")
+        raise RuntimeError(
+            "fetch_defillama_snapshot_sync() cannot be used inside a running event loop; use await fetch_defillama_snapshot(...)"
+        )
     return asyncio.run(fetch_defillama_snapshot(timeout_sec=timeout_sec, limit=limit))
+
 
 # for possible sync use
 def fetch_defillama_yields_snapshot_sync(
@@ -115,4 +119,6 @@ def fetch_defillama_yields_snapshot_sync(
         raise RuntimeError(
             "fetch_defillama_yields_snapshot_sync() cannot be used inside a running event loop; use await fetch_defillama_yields_snapshot(...)"
         )
-    return asyncio.run(fetch_defillama_yields_snapshot(timeout_sec=timeout_sec, limit=limit))
+    return asyncio.run(
+        fetch_defillama_yields_snapshot(timeout_sec=timeout_sec, limit=limit)
+    )

@@ -59,8 +59,18 @@ class DataCollectorService:
         lim = self.settings.snapshot_item_limit
 
         steps: list[tuple[str, Callable[[], "asyncio.Future[dict[str, Any]]"]]] = [
-            ("defillama_protocols", lambda: asyncio.ensure_future(fetch_defillama_snapshot(timeout_sec=timeout, limit=lim))),
-            ("defillama_yields", lambda: asyncio.ensure_future(fetch_defillama_yields_snapshot(timeout_sec=timeout, limit=lim))),
+            (
+                "defillama_protocols",
+                lambda: asyncio.ensure_future(
+                    fetch_defillama_snapshot(timeout_sec=timeout, limit=lim)
+                ),
+            ),
+            (
+                "defillama_yields",
+                lambda: asyncio.ensure_future(
+                    fetch_defillama_yields_snapshot(timeout_sec=timeout, limit=lim)
+                ),
+            ),
         ]
 
         tasks: list[tuple[str, asyncio.Future[dict[str, Any]]]] = []

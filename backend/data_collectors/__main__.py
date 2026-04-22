@@ -15,7 +15,9 @@ from backend.data_collectors.service import DataCollectorService
 
 def main() -> int:
     load_dotenv()
-    p = argparse.ArgumentParser(description="RWA Analytics: сбор DeFiLlama → JSON bundle / PostgreSQL")
+    p = argparse.ArgumentParser(
+        description="RWA Analytics: сбор DeFiLlama → JSON bundle / PostgreSQL"
+    )
     p.add_argument("--no-save", action="store_true", help="Не писать data/raw/*.json")
     p.add_argument(
         "--no-save-db",

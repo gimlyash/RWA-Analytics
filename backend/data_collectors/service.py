@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from pathlib import Path
@@ -43,7 +44,7 @@ class DataCollectorService:
     def __init__(self, settings: CollectorSettings | None = None) -> None:
         self.settings = settings or load_collector_settings()
 
-    def collect(self) -> CollectionBundle:
+    async def collect(self) -> CollectionBundle:
         collected_at = utc_now_iso()
         bundle = CollectionBundle(
             collected_at_utc=collected_at,
@@ -57,14 +58,31 @@ class DataCollectorService:
         timeout = int(self.settings.http_timeout_sec)
         lim = self.settings.snapshot_item_limit
 
-        steps: list[tuple[str, Callable[[], dict[str, Any]]]] = [
-            ("defillama_protocols", lambda: fetch_defillama_snapshot(timeout_sec=timeout, limit=lim)),
-            ("defillama_yields", lambda: fetch_defillama_yields_snapshot(timeout_sec=timeout, limit=lim)),
+        steps: list[tuple[str, Callable[[], "asyncio.Future[dict[str, Any]]"]]] = [
+            ("defillama_protocols", lambda: asyncio.ensure_future(fetch_defillama_snapshot(timeout_sec=timeout, limit=lim))),
+            ("defillama_yields", lambda: asyncio.ensure_future(fetch_defillama_yields_snapshot(timeout_sec=timeout, limit=lim))),
         ]
 
+        tasks: list[tuple[str, asyncio.Future[dict[str, Any]]]] = []
         for _label, fn in steps:
             try:
-                bundle.sources.append(_snapshot_from_fetch_result(fn()))
+                tasks.append((_label, fn()))
+            except Exception as e:
+                logger.exception("Collector step %s failed (schedule)", _label)
+                bundle.sources.append(
+                    SourceSnapshot(
+                        source=_label,
+                        fetched_at_utc=utc_now_iso(),
+                        ok=False,
+                        error=f"{type(e).__name__}: {e}",
+                        data={},
+                    )
+                )
+
+        for _label, task in tasks:
+            try:
+                result = await task
+                bundle.sources.append(_snapshot_from_fetch_result(result))
             except Exception as e:
                 logger.exception("Collector step %s failed", _label)
                 bundle.sources.append(
@@ -86,7 +104,7 @@ class DataCollectorService:
         filename_prefix: str = "snapshot",
         save_database: bool = True,
     ) -> tuple[CollectionBundle, Path]:
-        bundle = self.collect()
+        bundle = asyncio.run(self.collect())
         root = _repo_root()
         out_dir = output_dir or (root / self.settings.raw_output_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -105,7 +123,7 @@ class DataCollectorService:
         return bundle, path
 
     def collect_and_save_database_only(self) -> CollectionBundle:
-        bundle = self.collect()
+        bundle = asyncio.run(self.collect())
         if self.settings.database_url:
             run_id = persist_collection_bundle(self.settings.database_url, bundle)
             logger.info("PostgreSQL collection_runs.id=%s", run_id)
@@ -124,4 +142,4 @@ def collect_all(
         return bundle
     if save_database and service.settings.database_url:
         return service.collect_and_save_database_only()
-    return service.collect()
+    return asyncio.run(service.collect())

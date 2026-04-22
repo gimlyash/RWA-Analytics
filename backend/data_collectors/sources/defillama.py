@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
-import requests
+import httpx
 
 DEFILLAMA_PROTOCOLS_URL = "https://api.llama.fi/protocols"
 DEFILLAMA_YIELDS_URL = "https://yields.llama.fi/pools"
@@ -12,24 +13,25 @@ DEFILLAMA_YIELDS_URL = "https://yields.llama.fi/pools"
 DEFAULT_ITEM_LIMIT = 100
 
 
-def _request_json(url: str, timeout_sec: int) -> tuple[bool, Any, str | None]:
+async def _request_json(url: str, timeout_sec: int) -> tuple[bool, Any, str | None]:
     try:
-        response = requests.get(url, timeout=timeout_sec)
-        response.raise_for_status()
-        return True, response.json(), None
-    except requests.exceptions.HTTPError as exc:
+        async with httpx.AsyncClient(timeout=timeout_sec) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+            return True, response.json(), None
+    except httpx.HTTPStatusError as exc:
         return False, None, f"HTTP error: {exc}"
-    except requests.exceptions.RequestException as exc:
+    except httpx.RequestError as exc:
         return False, None, f"Network error: {exc}"
     except ValueError as exc:
         return False, None, f"Invalid JSON: {exc}"
 
 
-def fetch_defillama_snapshot(
+async def fetch_defillama_snapshot(
     timeout_sec: int = 30,
     limit: int = DEFAULT_ITEM_LIMIT,
 ) -> dict[str, Any]:
-    ok, payload, error = _request_json(DEFILLAMA_PROTOCOLS_URL, timeout_sec)
+    ok, payload, error = await _request_json(DEFILLAMA_PROTOCOLS_URL, timeout_sec)
     if not ok:
         return {
             "source": "defillama_protocols",
@@ -58,11 +60,11 @@ def fetch_defillama_snapshot(
     }
 
 
-def fetch_defillama_yields_snapshot(
+async def fetch_defillama_yields_snapshot(
     timeout_sec: int = 30,
     limit: int = DEFAULT_ITEM_LIMIT,
 ) -> dict[str, Any]:
-    ok, payload, error = _request_json(DEFILLAMA_YIELDS_URL, timeout_sec)
+    ok, payload, error = await _request_json(DEFILLAMA_YIELDS_URL, timeout_sec)
     if not ok:
         return {
             "source": "defillama_yields",
@@ -94,3 +96,23 @@ def fetch_defillama_yields_snapshot(
         "pools_total": len(pools),
         "pools": pools[:limit] if limit > 0 else pools,
     }
+
+# for possible sync use
+def fetch_defillama_snapshot_sync(
+    timeout_sec: int = 30,
+    limit: int = DEFAULT_ITEM_LIMIT,
+) -> dict[str, Any]:
+    if asyncio.get_event_loop().is_running():
+        raise RuntimeError("fetch_defillama_snapshot_sync() cannot be used inside a running event loop; use await fetch_defillama_snapshot(...)")
+    return asyncio.run(fetch_defillama_snapshot(timeout_sec=timeout_sec, limit=limit))
+
+# for possible sync use
+def fetch_defillama_yields_snapshot_sync(
+    timeout_sec: int = 30,
+    limit: int = DEFAULT_ITEM_LIMIT,
+) -> dict[str, Any]:
+    if asyncio.get_event_loop().is_running():
+        raise RuntimeError(
+            "fetch_defillama_yields_snapshot_sync() cannot be used inside a running event loop; use await fetch_defillama_yields_snapshot(...)"
+        )
+    return asyncio.run(fetch_defillama_yields_snapshot(timeout_sec=timeout_sec, limit=limit))

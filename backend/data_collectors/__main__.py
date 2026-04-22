@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import logging
 import sys
 
@@ -36,7 +37,7 @@ def main() -> int:
             bundle = svc.collect_and_save_database_only()
             print("Saved to PostgreSQL")
         else:
-            bundle = svc.collect()
+            bundle = asyncio.run(svc.collect())
     else:
         bundle, path = svc.collect_and_save_json(save_database=save_db)
         print(f"Saved: {path}")

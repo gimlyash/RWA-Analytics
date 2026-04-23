@@ -10,7 +10,8 @@ import httpx
 DEFILLAMA_PROTOCOLS_URL = "https://api.llama.fi/protocols"
 DEFILLAMA_YIELDS_URL = "https://yields.llama.fi/pools"
 
-DEFAULT_ITEM_LIMIT = 100
+# 0 means "no limit" (collect all items).
+DEFAULT_ITEM_LIMIT = 0
 
 
 async def _request_json(url: str, timeout_sec: int) -> tuple[bool, Any, str | None]:

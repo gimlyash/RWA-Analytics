@@ -1,15 +1,14 @@
-"""Подключение к PostgreSQL и запись бандлов сборщика."""
+"""Подключение к PostgreSQL и запись бандлов сборщика через Django ORM."""
 
 from __future__ import annotations
 
 from datetime import datetime
-from functools import lru_cache
+import os
 
-from sqlalchemy import create_engine
-from sqlalchemy.engine import Engine
-from sqlalchemy.orm import sessionmaker
+import django
+from django.conf import settings
+from django.db import transaction
 
-from backend.core.db_models import Base, CollectionRun, SourceSnapshotRow
 from backend.data_collectors.models import CollectionBundle
 
 
@@ -20,40 +19,46 @@ def _parse_iso_utc(value: str) -> datetime:
     return datetime.fromisoformat(prepared)
 
 
-@lru_cache(maxsize=8)
-def get_engine(database_url: str) -> Engine:
-    return create_engine(database_url, pool_pre_ping=True, future=True)
+def _ensure_django(*, database_url: str | None) -> None:
+    """
+    Позволяет использовать Django ORM из обычного python-кода (без manage.py).
 
+    Если передан `database_url`, он будет использован как `DATABASE_URL`.
+    """
+    if database_url:
+        os.environ.setdefault("DATABASE_URL", database_url)
+    os.environ.setdefault(
+        "DJANGO_SETTINGS_MODULE", "backend.rwa_analytics_config.settings"
+    )
 
-def init_db(database_url: str) -> None:
-    engine = get_engine(database_url)
-    Base.metadata.create_all(engine)
+    if not settings.configured:
+        django.setup()
 
 
 def persist_collection_bundle(database_url: str, bundle: CollectionBundle) -> int:
-    init_db(database_url)
-    engine = get_engine(database_url)
-    session_local = sessionmaker(engine, expire_on_commit=False, future=True)
+    _ensure_django(database_url=database_url)
 
-    with session_local() as session:
-        run = CollectionRun(
+    # Import models only after django.setup(), иначе settings не сконфигурированы.
+    from backend.core.models import CollectionRun, SourceSnapshotRow
+
+    with transaction.atomic():
+        run = CollectionRun.objects.create(
             collected_at_utc=_parse_iso_utc(bundle.collected_at_utc),
             meta=bundle.meta,
         )
-        session.add(run)
-        session.flush()
 
-        for snap in bundle.sources:
-            session.add(
+        SourceSnapshotRow.objects.bulk_create(
+            [
                 SourceSnapshotRow(
-                    collection_run_id=run.id,
+                    run=run,
                     source=snap.source,
                     fetched_at_utc=_parse_iso_utc(snap.fetched_at_utc),
-                    ok=snap.ok,
+                    ok=bool(snap.ok),
                     error=snap.error,
                     data=snap.data,
                 )
-            )
+                for snap in bundle.sources
+            ]
+        )
 
-        session.commit()
-        return int(run.id)
+    return int(run.id)

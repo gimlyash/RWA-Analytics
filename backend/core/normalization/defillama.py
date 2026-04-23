@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import Any
 
@@ -57,6 +58,34 @@ def _slugify_defillama(value: Any) -> str | None:
     return slug or None
 
 
+def _parse_allowlist(env_value: str | None) -> set[str] | None:
+    """
+    Comma/space separated list -> set of normalized slugs.
+
+    - None/empty -> None (meaning: no filtering)
+    - Supports commas and whitespace
+    """
+    if not env_value:
+        return None
+    raw = env_value.strip()
+    if not raw:
+        return None
+
+    parts: list[str] = []
+    for chunk in raw.split(","):
+        chunk = chunk.strip()
+        if not chunk:
+            continue
+        parts.extend([p for p in chunk.split() if p.strip()])
+
+    normalized: set[str] = set()
+    for p in parts:
+        slug = _slugify_defillama(p)
+        if slug:
+            normalized.add(slug)
+    return normalized or None
+
+
 @dataclass(frozen=True)
 class DefiLlamaNormalizeResult:
     run_id: int
@@ -78,6 +107,9 @@ def normalize_defillama_run(*, run_id: int) -> DefiLlamaNormalizeResult:
     """
     run = CollectionRun.objects.get(id=run_id)
     ts = run.collected_at_utc
+
+    rwa_protocol_slugs = _parse_allowlist(os.environ.get("RWA_PROTOCOL_SLUGS"))
+    rwa_yield_projects = _parse_allowlist(os.environ.get("RWA_YIELD_PROJECTS"))
 
     protocols_snapshot = (
         SourceSnapshotRow.objects.filter(run_id=run_id, source="defillama_protocols", ok=True)
@@ -106,6 +138,8 @@ def normalize_defillama_run(*, run_id: int) -> DefiLlamaNormalizeResult:
                     name = _safe_str(p.get("name")) or _safe_str(p.get("slug")) or _safe_str(p.get("id"))
                     slug = _slugify_defillama(p.get("slug")) or _slugify_defillama(name)
                     if not name or not slug:
+                        continue
+                    if rwa_protocol_slugs is not None and slug not in rwa_protocol_slugs:
                         continue
 
                     obj, created = Protocol.objects.update_or_create(
@@ -149,6 +183,9 @@ def normalize_defillama_run(*, run_id: int) -> DefiLlamaNormalizeResult:
                     symbol = _safe_str(pool.get("symbol"))
 
                     protocol_slug = _slugify_defillama(project)
+                    if rwa_yield_projects is not None:
+                        if not protocol_slug or protocol_slug not in rwa_yield_projects:
+                            continue
                     protocol_obj = None
                     if protocol_slug:
                         protocol_obj, _ = Protocol.objects.get_or_create(
